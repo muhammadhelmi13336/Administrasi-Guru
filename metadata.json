@@ -1,0 +1,7 @@
+{
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "name": "EduScan Teacher Pro",
+  "description": "Multi-platform student management system with AI reporting and barcode scanning."
+}
