@@ -32,12 +32,16 @@ import {
   Link as LinkIcon,
   Settings,
   Edit3,
-  BookOpen
+  BookOpen,
+  Lock
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
 // Initialize AI
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Constants
+const ADMIN_SECRET_CODE = "5433"; // Kode khusus admin diperbarui sesuai permintaan
 
 // Types
 interface Grade {
@@ -85,8 +89,11 @@ const App = () => {
   const [isClassroomConnected, setIsClassroomConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   
-  // Student Auth & Profile State
+  // Login States
+  const [teacherLoginCode, setTeacherLoginCode] = useState('');
   const [studentLoginId, setStudentLoginId] = useState('');
+  
+  // Student Auth & Profile State
   const [loggedInStudent, setLoggedInStudent] = useState<Student | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [newName, setNewName] = useState('');
@@ -108,7 +115,6 @@ const App = () => {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
-    // Update loggedInStudent if students change (for name updates)
     if (loggedInStudent) {
       const updated = students.find(s => s.id === loggedInStudent.id);
       if (updated) setLoggedInStudent(updated);
@@ -203,7 +209,15 @@ const App = () => {
     alert("Nama akun berhasil diubah!");
   };
 
-  // Fix: Implemented handleStudentLogin to allow students to access their portal
+  const handleTeacherLogin = () => {
+    if (teacherLoginCode === ADMIN_SECRET_CODE) {
+      setViewMode('guru');
+      setTeacherLoginCode('');
+    } else {
+      alert("Kode Akses Admin Salah! Silakan periksa kembali.");
+    }
+  };
+
   const handleStudentLogin = () => {
     if (!studentLoginId.trim()) {
       alert("Silakan masukkan ID Akun Belajar Anda.");
@@ -218,7 +232,6 @@ const App = () => {
     }
   };
 
-  // Fix: Implemented downloadBarcode to enable barcode saving for students
   const downloadBarcode = async (id: string, name: string) => {
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${id}`;
     try {
@@ -232,7 +245,6 @@ const App = () => {
       document.body.removeChild(link);
     } catch (e) {
       console.error("Gagal mengunduh barcode", e);
-      alert("Gagal mengunduh barcode. Silakan coba lagi.");
     }
   };
 
@@ -283,18 +295,35 @@ const App = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div 
-              className="bg-white rounded-[48px] p-12 shadow-2xl border-2 border-slate-50 group hover:border-indigo-600 transition-all cursor-pointer flex flex-col items-center text-center" 
-              onClick={() => setViewMode('guru')}
-            >
+            {/* Guru/Admin Login Card */}
+            <div className="bg-white rounded-[48px] p-12 shadow-2xl border-2 border-slate-50 group transition-all flex flex-col items-center">
               <div className="w-24 h-24 bg-indigo-100 rounded-3xl flex items-center justify-center text-indigo-600 mb-8 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
                 <ShieldCheck size={48} />
               </div>
               <h2 className="text-3xl font-black text-slate-900 mb-3">Login Guru</h2>
-              <p className="text-slate-500 text-sm mb-10 leading-relaxed">Kelola pengelompokan kelas & mata pelajaran, absensi, dan publikasi rapor digital.</p>
-              <button className="mt-auto bg-indigo-600 text-white font-black py-5 px-12 rounded-2xl shadow-xl shadow-indigo-100 uppercase tracking-widest text-xs">Admin Dashboard</button>
+              <p className="text-slate-500 text-sm mb-10 leading-relaxed text-center">Masukkan kode akses khusus untuk mengelola kelas dan data pengajaran.</p>
+              
+              <div className="w-full space-y-4">
+                <div className="relative">
+                  <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  <input 
+                    type="password" 
+                    placeholder="Kode Akses Admin" 
+                    value={teacherLoginCode}
+                    onChange={(e) => setTeacherLoginCode(e.target.value)}
+                    className="w-full pl-14 pr-8 py-5 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-indigo-600 outline-none font-bold text-center text-lg"
+                  />
+                </div>
+                <button 
+                  onClick={handleTeacherLogin}
+                  className="w-full bg-indigo-600 text-white font-black py-5 px-10 rounded-2xl shadow-xl shadow-indigo-100 uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-indigo-700 transition-all"
+                >
+                  <LogIn size={20} /> Verifikasi Admin
+                </button>
+              </div>
             </div>
 
+            {/* Student Login Card */}
             <div className="bg-white rounded-[48px] p-12 shadow-2xl border-2 border-slate-50 group hover:border-amber-500 transition-all flex flex-col">
               <div className="w-24 h-24 bg-amber-100 rounded-3xl flex items-center justify-center text-amber-600 mb-8 mx-auto">
                 <GraduationCap size={48} />
@@ -656,41 +685,6 @@ const App = () => {
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL BULK */}
-        {showBulkModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
-            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl" onClick={() => setShowBulkModal(false)}></div>
-            <div className="relative bg-white rounded-[56px] w-full max-w-3xl overflow-hidden shadow-2xl shadow-indigo-500/20">
-              <div className="p-12 bg-indigo-600 text-white flex justify-between items-center">
-                <div>
-                  <h3 className="text-4xl font-black mb-2 leading-none">Input Cepat Group</h3>
-                  <p className="opacity-80 font-medium">Buat pengelompokan kelas dan mata pelajaran.</p>
-                </div>
-                <button onClick={() => setShowBulkModal(false)} className="p-4 bg-white/10 hover:bg-white/20 rounded-3xl transition-all"><X size={32} /></button>
-              </div>
-              <div className="p-12 space-y-8">
-                <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Nama Kelas</label>
-                    <input type="text" placeholder="Contoh: 10-A" value={bulkClassName} onChange={(e) => setBulkClassName(e.target.value)} className="w-full px-8 py-5 rounded-3xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none font-bold" />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Mata Pelajaran</label>
-                    <input type="text" placeholder="Contoh: Fisika" value={bulkSubjectName} onChange={(e) => setBulkSubjectName(e.target.value)} className="w-full px-8 py-5 rounded-3xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none font-bold" />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Daftar Nama (Satu baris per siswa)</label>
-                  <textarea rows={6} placeholder="Budi Santoso&#10;Siti Aminah..." value={bulkNames} onChange={(e) => setBulkNames(e.target.value)} className="w-full px-8 py-6 rounded-[32px] bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none font-medium resize-none"></textarea>
-                </div>
-                <button onClick={handleBulkAdd} className="w-full bg-slate-900 text-white font-black py-6 rounded-3xl shadow-2xl text-sm uppercase tracking-widest hover:bg-indigo-700 transition-all duration-500">
-                  Eksekusi & Simpan Data
-                </button>
-              </div>
             </div>
           </div>
         )}
